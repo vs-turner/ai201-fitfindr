@@ -26,7 +26,7 @@ Note: First commit, used python [app.py](http://app.py) fields to observe the li
 
 ## What This Does
 
-
+FitFindr takes a thrift shopping ask in plain language and runs a short planning loop over three tools. It parses keywords, size, and a price ceiling from the query, searches a local listings file, picks the top match, asks the model for outfit ideas against the user’s wardrobe, and writes a short fit card caption. When search returns an empty list, the run stops after that step and names what to try changing.
 
 ---
 
@@ -76,13 +76,13 @@ Note: First commit, used python [app.py](http://app.py) fields to observe the li
 
 
 
-**Branch rule:** If `search_listings` returns an empty list, set `session["error"]` to a message that tells the user what to change (widen price, drop or change size, try different keywords) and return the session without calling `suggest_outfit` or `create_fit_card`. Otherwise, take the first result as `session["selected_item"]` and go to `suggest_outfit`, then `create_fit_card`.
+**Branch rule:** After `search_listings`, check `session["search_results"]`. If the list is empty, set `session["error"]` to a message that names what the user could change (widen price, drop or change size, try different keywords) and return. If the list has items, set `session["selected_item"]` to the first result, then call `suggest_outfit`, then `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** 
+**How the query is parsed:** Regex in `parse_query()`. It pulls `under` / `below` / `max` price phrases and `size …` out of the string, then strips a short filler prefix like `looking for`. What remains is `description`. That dict lands in `session["parsed"]`.
 
-**What moves through the session:**
+**What moves through the session:** `parsed` → `search_results` → `selected_item` (first result) → `outfit_suggestion` → `fit_card`. Each tool writes into the session. The next step reads from it. On empty search, `error` is set and `fit_card` stays unset.
 
 ---
 
@@ -95,25 +95,34 @@ Note: First commit, used python [app.py](http://app.py) fields to observe the li
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   For an effortless Y2K streetwear look, pair the butterfly baby tee with the **baggy straight-leg jeans**...
+
+  Fit card: Still pinching myself over scoring this Y2K Baby Tee — Butterfly Print on depop. For just $18.0...
 ```
 
 **The three tools, tested one at a time**
 
 ```
-$ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
-
+$ python -c "from tools import search_listings; print([(r['id'], r['title'], r['price']) for r in search_listings('graphic tee', max_price=30)])"
+[('lst_002', 'Y2K Baby Tee — Butterfly Print', 18.0), ('lst_006', 'Graphic Tee — 2003 Tour Bootleg Style', 24.0), ('lst_017', 'Mesh Long-Sleeve Top — Black', 15.0), ('lst_033', 'Vintage Band Tee — Faded Grey', 19.0), ('lst_011', 'Low-Rise Cargo Pants — Khaki', 27.0), ('lst_015', 'Vintage Graphic Hoodie — Faded Black', 26.0)]
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+**Outfit 1: Casual Streetwear**
+Pair the vintage Levi's 501 jeans with the **White ribbed tank top** tucked in, layered under the **Oversized grey crewneck sweatshirt**. Accessorize with the **Brown leather belt**, **Chunky white sneakers**, and the **Black crossbody bag** for an effortless, classic streetwear look.
 
+**Outfit 2: Edge & Denim**
+Style the medium-wash jeans with the **Black cropped zip hoodie** and the **Vintage black denim jacket** layered on top for a cool double-denim contrast. Finish the outfit with the **Black combat boots** and the **Black crossbody bag** for an edgy, vintage-inspired vibe.
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
-
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+Still can't believe I found these Vintage Levi's 501 Jeans — Medium Wash just sitting there on depop. Snagged them for only $38.0 and they fit like a absolute glove. Honestly, they're going to live with my favorite white sneakers all fall.
 ```
 
 ---
@@ -126,15 +135,15 @@ $ python -c "from tools import create_fit_card; ..."
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* help implementing `search_listings` from the Tool Inventory, with size matching and keyword scoring
+- *What came back:* a draft that used a substring check for size, so asking for `"S"` also matched listings sized `"US 9"`
+- *What I changed:* switched to splitting listing sizes on `/`, spaces, and parentheses, then matching whole tokens only
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* wire `run_agent` so an empty search stops before the later tools, with every result stored in the session
+- *What came back:* a draft that kept the top listing in a local variable and passed it straight into `suggest_outfit`
+- *What I changed:* wrote each tool result into the session and read the next inputs back out of the session so `selected_item` stays checkable against `search_results[0]`
 
 
 
