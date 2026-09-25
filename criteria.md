@@ -25,109 +25,59 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+I picked 4 of 5 instead of 5 of 5 because `search_listings` is a plain keyword overlap score. Small changes in wording can drop every listing to score 0 even when a human would say the data has a match. I will add some flexibility just for false negatives in search.
 
 ---
 
-## 2. An impossible query stops before the second tool
+## 2. An query with no matches stops before the second tool
 
 Given a query that matches no listings, the agent stops before calling
-`suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
+`suggest_outfit` and returns a message naming what to change in 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+5 of 5 is fair here because this path does not depend on the model. Empty
+search returns `[]` every time for an impossible query, and the branch is plain Python:. If the list is empty, set `session["error"]` and return. If this fails once, the loop is wrong.
 
 ---
 
-## 3. Something about state
+## 3. Selected item is the same object the next tool receives
 
-<!-- YOU WRITE THIS ONE.
+Given a matching query that produces at least one search result, in 5 of 5
+tries both of these hold: (1) `session["selected_item"]["id"]` equals
+`session["search_results"][0]["id"]`, and (2) the `suggest_outfit` trace step
+shows `inputs["new_item"]["id"]` equal to that same `id`.
 
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** State wiring is deterministic code with no model call, so 5 of 5 seems reasonable. Matching on title alone would miss a swap between two similarly named listings. Checking only `session["selected_item"]` would miss a bug that stores
+the right item in the session but passes a different dict into the next tool.
+`id` is unique in the data, so a scorer does not need to ask what “the same
+item” means.
 
 ---
 
-## 4. Something about the fit card
+## 4. Fit card stays usable across model variance
 
-<!-- YOU WRITE THIS ONE.
+Run the agent 5 times on the same matching query. In at least 4 of 5 runs, the
+fit card is a non-empty string of 2 to 4 sentences that mentions both the
+selected item’s `price` (as a number) and its `platform` (as a substring). The
+5 cards need not be identical, and at least 2 of the 5 must differ by more than
+whitespace.
 
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** The fit card calls a model, so word-for-word sameness is not necessary. Price + platform + length is something a person can score from the session alone. I kept the threshold at 4 of 5 leaves room for one model miss without pretending a flaky caption is a pass.
 
 ---
 
-## 5. Your choice
+## 5. Search respects the price ceiling
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+Given a query that states an explicit max price (for example `under $30`), in
+5 of 5 tries every listing in `session["search_results"]` has
+`price` less than or equal to that max. An empty `search_results` list still
+passes, because there is no over-budget item to catch.
 
 **Why this target:**
-
-
+Price filtering is local code over floats, not a model judgment, so 5 of 5 is
+appropriate. A softer target would hide a bug that returns a $45 jacket for an
+“under $30” ask. I care about this because a wrong price makes the later outfit
+and fit card look fine while the agent already failed the user’s constraint.
 
 ---
 
-<!-- ─────────────────────────────────────────────────────────────────────────
-     UNIT 4 — read this before you change anything above.
-
-     If a criterion turns out to be BROKEN rather than merely unmet, you can
-     revise it, and that earns credit. But never delete or edit the original
-     line. Add the revision underneath it, like this:
-
-         ## 4. Something about the fit card
-
-         The fit card is different every time.
-
-         **Why this target:** ...
-
-         > **Revised in unit 4:** For 5 different items, the 5 fit cards share
-         > no opening sentence.
-         >
-         > **Why revised:** "different" wasn't checkable — two cards that
-         > differed by one word still counted. The new version is something I
-         > can actually score.
-
-     That's a revision because the criterion couldn't be MEASURED.
-
-     Lowering a target because you missed it is not a revision, and it costs
-     you the point:
-
-         ✗ "I said the empty search stops it 5 of 5 times, but I got 3 of 5,
-            so 3 of 5 is more realistic."
-
-     A number you missed stays where it is, gets diagnosed, and gets a fix
-     attempted. That's where the points are.
-     ───────────────────────────────────────────────────────────────────────── -->
