@@ -38,28 +38,35 @@ Note: First commit, used python [app.py](http://app.py) fields to observe the li
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** 
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Filters `data/listings.json` by optional size and price, scores the rest by keyword overlap with the description, and returns the best matches first (at most `config.SEARCH_RESULT_LIMIT`).
+- **Inputs:**
+  - `description` (`str`): keywords for what the user wants (e.g. `"vintage graphic tee"`). Used only for scoring. Never raises if empty, but an empty description yields score 0 for every listing, so the result is empty.
+  - `size` (`str | None`): size to filter by, or `None` to skip size filtering. Match is case-insensitive. A listing matches when, after uppercasing both sides, either the listing `size` equals `size`, or `size` appears as a whole token when the listing size is split on `/`, whitespace, and parentheses. So `"M"` matches `"M"`, `"M/L"`, and `"S/M"`. `"S"` does **not** match `"US 9"`. `"L"` does **not** match `"XL"`.
+  - `max_price` (`float | None`): inclusive price ceiling, or `None` to skip price filtering. Keep a listing when `listing["price"] <= max_price`.
+- **Returns:** A `list[dict]` of matching listing dicts, highest keyword-overlap score first, length ≤ `config.SEARCH_RESULT_LIMIT`. Drop any listing with score 0. Each dict has: `id` (`str`), `title` (`str`), `description` (`str`), `category` (`str`), `style_tags` (`list[str]`), `size` (`str`), `condition` (`str`), `price` (`float`), `colors` (`list[str]`), `brand` (`str | None`), `platform` (`str`).
+- **When it has nothing:** Returns `[]` (empty list). Never `None`. Never an exception. The loop branches on this.
 
 
 
 ### `suggest_outfit`
 
-- **What it does:**
+- **What it does:** Calls the model (via `generate()`) to suggest one or two outfits that pair a chosen thrift listing with what the user already owns.
 - **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+  - `new_item` (`dict`): one listing dict in the same shape `search_listings` returns (at least `title`, `category`, `colors`, `style_tags`, `size`, `price`, `platform`).
+  - `wardrobe` (`dict`): has key `items` (`list[dict]`). Each wardrobe item has `id` (`str`), `name` (`str`), `category` (`str`), `colors` (`list[str]`), `style_tags` (`list[str]`), `notes` (`str | None`). `items` may be empty.
+- **Returns:** A non-empty `str`: one or two outfit suggestions. If `wardrobe["items"]` is non-empty, name specific pieces from that list. If `wardrobe["items"]` is empty, return general styling advice for `new_item` alone (still a non-empty string, do not raise).
+- **When it has nothing:** There is no “no outfit” empty case for the loop. An empty wardrobe still returns a non-empty advice string. If the model is unreachable, that is handled in `run_agent` (not inside this tool) via `ModelUnavailable`.
 
 
 
 ### `create_fit_card`
 
-- **What it does:**
+- **What it does:** Calls the model (via `generate()`) to write a short social-style caption about the find, using the outfit suggestion and the listing.
 - **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+  - `outfit` (`str`): the outfit suggestion string from `suggest_outfit`.
+  - `new_item` (`dict`): the same listing dict that went into `suggest_outfit` (needs at least `title`, `price`, `platform`).
+- **Returns:** A `str` caption, two to four sentences, that mentions the item, its price, and its platform once each, and sounds like a real post rather than a product blurb.
+- **When it has nothing:** If `outfit` is empty or whitespace-only, return a short descriptive fallback string about the item (still a `str`, not `None`, not an exception) instead of calling the model / raising. The planning loop’s empty branch is on search, not on this tool.
 
 ---
 
@@ -69,13 +76,13 @@ Note: First commit, used python [app.py](http://app.py) fields to observe the li
 
 
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, set `session["error"]` to a message that tells the user what to change (widen price, drop or change size, try different keywords) and return the session without calling `suggest_outfit` or `create_fit_card`. Otherwise, take the first result as `session["selected_item"]` and go to `suggest_outfit`, then `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
 **How the query is parsed:** 
 
-**What moves through the session:** 
+**What moves through the session:**
 
 ---
 
