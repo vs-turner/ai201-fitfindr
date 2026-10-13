@@ -162,18 +162,22 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     iterations += 1
     trace.check_iterations(iterations)
     session["parsed"] = parse_query(session["query"])
+    trace.step("parse_query", inputs={"query": session["query"]}, returned=session["parsed"])
 
     # 2. Search (over MCP — same list[dict] shape as the direct tool)
     iterations += 1
     trace.check_iterations(iterations)
     parsed = session["parsed"]
-    session["search_results"] = call_tool(
-        "search_listings",
-        {
-            "description": parsed["description"],
-            "size": parsed["size"],
-            "max_price": parsed["max_price"],
-        },
+    search_inputs = {
+        "description": parsed["description"],
+        "size": parsed["size"],
+        "max_price": parsed["max_price"],
+    }
+    session["search_results"] = call_tool("search_listings", search_inputs)
+    trace.step(
+        "search_listings (via MCP)",
+        inputs=search_inputs,
+        returned=session["search_results"],
     )
 
     # Branch: empty search → stop before the model tools
@@ -182,28 +186,63 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             "No listings matched that search. Try different keywords, "
             "drop or change the size, or widen the price ceiling."
         )
+        trace.step(
+            "branch",
+            note="empty search — stopping before suggest_outfit / create_fit_card",
+        )
         return session
 
     # 3. Select first result (via session, not a local handoff)
     iterations += 1
     trace.check_iterations(iterations)
     session["selected_item"] = session["search_results"][0]
-
-    # 4. Outfit — read item and wardrobe back from the session
-    iterations += 1
-    trace.check_iterations(iterations)
-    session["outfit_suggestion"] = suggest_outfit(
-        session["selected_item"],
-        session["wardrobe"],
+    trace.step(
+        "select_item",
+        inputs={"from": "search_results[0]"},
+        returned=session["selected_item"],
     )
 
-    # 5. Fit card — read outfit and item back from the session
-    iterations += 1
-    trace.check_iterations(iterations)
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"],
-        session["selected_item"],
-    )
+    # 4–5. Model tools — catch unreachable model so the user gets a message,
+    # not a stack trace
+    try:
+        iterations += 1
+        trace.check_iterations(iterations)
+        session["outfit_suggestion"] = suggest_outfit(
+            session["selected_item"],
+            session["wardrobe"],
+        )
+        trace.step(
+            "suggest_outfit",
+            inputs={
+                "new_item": session["selected_item"],
+                "wardrobe_items": len((session["wardrobe"] or {}).get("items") or []),
+            },
+            returned=session["outfit_suggestion"],
+        )
+
+        iterations += 1
+        trace.check_iterations(iterations)
+        session["fit_card"] = create_fit_card(
+            session["outfit_suggestion"],
+            session["selected_item"],
+        )
+        trace.step(
+            "create_fit_card",
+            inputs={
+                "outfit": session["outfit_suggestion"],
+                "new_item": session["selected_item"],
+            },
+            returned=session["fit_card"],
+        )
+    except ModelUnavailable as exc:
+        session["error"] = (
+            f"{exc} FitFindr stopped before writing a fit card — fix the key "
+            "or your connection, then try this search again."
+        )
+        trace.step(
+            "model_unavailable",
+            note=session["error"],
+        )
 
     return session
 

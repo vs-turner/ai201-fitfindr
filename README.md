@@ -198,21 +198,48 @@ that produced it:
 
 ## Loop Trace
 
+Triggered failures (what the agent said):
 
+- **Empty search** (`designer ballgown size XXS under $5`):
+  `No listings matched that search. Try different keywords, drop or change the size, or widen the price ceiling.`
+- **Empty wardrobe** (`denim jacket under $50 --empty-wardrobe`): no crash; `suggest_outfit` returned general styling advice (non-empty string) naming silhouettes/colors/shoes instead of owned pieces, then a fit card.
+- **Model unavailable** (one character flipped in `GEMINI_API_KEY`, fresh query `olive corduroy overshirt under $45 size M`):
+  `The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com. FitFindr stopped before writing a fit card — fix the key or your connection, then try this search again.`
 
-**Happy path**
-
-```
-
-```
-
-**Empty search**
-
-```
+**Happy path** (`python app.py ask 'vintage graphic tee under $30' --trace`)
 
 ```
+[1] parse_query
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] select_item
+      in:  dict with keys: from
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+[4] suggest_outfit
+      in:  dict with keys: new_item, wardrobe_items
+      out: For an effortless Y2K streetwear look, pair the butterfly baby tee with the **baggy straight-leg jeans** to ba…
+[5] create_fit_card
+      in:  dict with keys: outfit, new_item
+      out: Still pinching myself over scoring this Y2K Baby Tee — Butterfly Print on depop. For just $18.0, it instantly …
+```
 
-**On the MCP move:** 
+**Empty search** (`python app.py ask 'designer ballgown size XXS under $5' --trace`)
+
+```
+[1] parse_query
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch
+      →    empty search — stopping before suggest_outfit / create_fit_card
+```
+
+**On the MCP move:** `search_listings` is registered in `mcp_server.py` and called from `run_agent` via `mcp_client.call_tool`. The happy-path and empty-search traces both label that step `search_listings (via MCP)`.
 
 ---
 
