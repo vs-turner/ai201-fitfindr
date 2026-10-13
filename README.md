@@ -219,19 +219,23 @@ Found the absolute cutest Y2K Baby Tee — Butterfly Print scrolling on depop th
 
 ## Verdicts and Diagnoses
 
-
-
-
-| #   | Criterion | Target | Verdict | How I decided |
+| # | Criterion | Target | Verdict | How I decided |
 | --- | --------- | ------ | ------- | ------------- |
-| 1   |           |        |         |               |
-| 2   |           |        |         |               |
-| 3   |           |        |         |               |
-| 4   |           |        |         |               |
-| 5   |           |        |         |               |
-
+| 1 | Matching query completes all three tools + fit card | 4 of 5 | MET | 5/5 tries finished with search, outfit, and a non-empty fit card. No early stop. Trace shows all three tools. |
+| 2 | Empty search stops before tool 2 | 5 of 5 | MET | 5/5 tries: search returned `[]`, branch set `session["error"]` naming keywords/size/price, and `suggest_outfit` never ran. |
+| 3 | Selected item id matches item passed to suggest_outfit | 5 of 5 | MET | 5/5 tries: `selected_item.id` equals `search_results[0].id`, and the suggest_outfit trace note shows the same id in `inputs['new_item']['id']`. |
+| 4 | Fit card usable across model variance | 4 of 5 | MET | 5/5 cards were 2 to 4 sentences and mentioned price and platform. All five cards differed by more than whitespace. |
+| 5 | Search respects the price ceiling | 5 of 5 | MET | 5/5 tries: every price in `search_results` was <= 30.0 for `under $30`. |
 
 **Diagnoses**
+
+I missed nothing. Every criterion met its target on the before run in `results/run_2026-10-13_1541_before.md`.
+
+Were the targets low? Partly. Criteria 2, 3, and 5 are plain Python (branch, session wiring, price filter), so 5 of 5 is the right bar and hitting it only shows those paths are wired correctly, not that they were hard. Criterion 1 used a query the data always matches (`vintage graphic tee under $30`), so the 4 of 5 slack for keyword false negatives never got stress-tested. Criterion 4 left room for one model miss, and the model never used it: price and platform are already in the `create_fit_card` prompt, so the model mostly repeats them.
+
+The criterion I would tighten is 4. I would keep the same scoring rules (2 to 4 sentences, price number, platform substring, at least two cards that differ) but raise the target from 4 of 5 to 5 of 5. With caching off and temperature at 0.9, five usable cards is a fair ask; leaving a free miss makes a prompt that already feeds price and platform look safer than it is.
+
+No criterion rewrite. None of them were unmeasurable. Soft targets are not the same as a broken criterion.
 
 ---
 
