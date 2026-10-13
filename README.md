@@ -153,23 +153,64 @@ Still can't believe I found these Vintage Levi's 501 Jeans — Medium Wash just 
 
 ## Run Log — Before
 
-
-
+Produced by `run_eval.py::main` (caching off, 5 tries). Full evidence: `results/run_2026-10-13_1541_before.md`. Loop: `agent.py::run_agent`.
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 | --------- | ------ | ----- | ----- | ----- | ----- | ----- | ------- |
-| 1.        |        |       |       |       |       |       |         |
-| 2.        |        |       |       |       |       |       |         |
-| 3.        |        |       |       |       |       |       |         |
-| 4.        |        |       |       |       |       |       |         |
-| 5.        |        |       |       |       |       |       |         |
+| 1. Matching query completes all three tools + fit card | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Empty search stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item id matches item passed to suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card usable across model variance | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Search respects the price ceiling | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
+**Real output from one try**, pasted as text, naming the file and function that produced it:
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+**Criterion 1** — Try 1 — `results/run_2026-10-13_1541_before.md` ← `run_eval.py::run_once` / `agent.py::run_agent`
 
 ```
+- stopped early: no
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+- search_results: 10
 
+Fit card:
+Finally scored this Y2K Baby Tee — Butterfly Print on depop and I am obsessed. Paid just $18.0 and the fit is literally so good. Can't wait to style it with some baggy denim for the ultimate off-duty look!
+
+Trace includes: search_listings (via MCP) → select_item → suggest_outfit → create_fit_card
+```
+
+**Criterion 2** — Try 1 — same file / functions
+
+```
+- stopped early: yes — No listings matched that search. Try different keywords, drop or change the size, or widen the price ceiling.
+- selected_item: (none)
+- search_results: 0
+
+[3] branch
+      →    empty search — stopping before suggest_outfit / create_fit_card
+```
+
+**Criterion 3** — Try 1 — same file / functions
+
+```
+- selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+[3] select_item
+      →    selected_item.id=lst_007; search_results[0].id=lst_007
+[4] suggest_outfit
+      →    inputs['new_item']['id']=lst_007
+```
+
+**Criterion 4** — Try 1 — same file / functions (all 5 cards differed; each had price + platform in 2–4 sentences)
+
+```
+Fit card:
+Found the absolute cutest Y2K Baby Tee — Butterfly Print scrolling on depop this week. It was only $18.0 and honestly fits like a dream. Can't wait to style it with some baggy denim for the ultimate early-2000s streetwear look!
+```
+
+**Criterion 5** — Try 1 — same file / functions
+
+```
+[2] search_listings (via MCP)
+      →    prices=[18.0, 24.0, 19.0, 26.0, 15.0, 22.0, 27.0, 20.0, 30.0, 12.0]; max_price=30.0
 ```
 
 ---

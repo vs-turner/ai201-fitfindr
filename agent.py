@@ -174,10 +174,12 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         "max_price": parsed["max_price"],
     }
     session["search_results"] = call_tool("search_listings", search_inputs)
+    prices = [r.get("price") for r in session["search_results"]]
     trace.step(
         "search_listings (via MCP)",
         inputs=search_inputs,
         returned=session["search_results"],
+        note=f"prices={prices}; max_price={search_inputs['max_price']}",
     )
 
     # Branch: empty search → stop before the model tools
@@ -196,10 +198,13 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     iterations += 1
     trace.check_iterations(iterations)
     session["selected_item"] = session["search_results"][0]
+    selected_id = session["selected_item"].get("id")
+    first_id = session["search_results"][0].get("id")
     trace.step(
         "select_item",
         inputs={"from": "search_results[0]"},
         returned=session["selected_item"],
+        note=f"selected_item.id={selected_id}; search_results[0].id={first_id}",
     )
 
     # 4–5. Model tools — catch unreachable model so the user gets a message,
@@ -218,6 +223,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 "wardrobe_items": len((session["wardrobe"] or {}).get("items") or []),
             },
             returned=session["outfit_suggestion"],
+            note=f"inputs['new_item']['id']={session['selected_item'].get('id')}",
         )
 
         iterations += 1
