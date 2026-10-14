@@ -131,8 +131,6 @@ Still can't believe I found these Vintage Levi's 501 Jeans — Medium Wash just 
 
 ## How I Used AI
 
-
-
 **Moment 1**
 
 - *What I asked for:* help implementing `search_listings` from the Tool Inventory, with size matching and keyword scoring
@@ -145,7 +143,17 @@ Still can't believe I found these Vintage Levi's 501 Jeans — Medium Wash just 
 - *What came back:* a draft that kept the top listing in a local variable and passed it straight into `suggest_outfit`
 - *What I changed:* wrote each tool result into the session and read the next inputs back out of the session so `selected_item` stays checkable against `search_results[0]`
 
+**Moment 3 (this unit)**
 
+- *What I asked for:* register `search_listings` on MCP and swap the direct call in `run_agent` for `call_tool`
+- *What came back:* a registration that matched the Tool Inventory types, plus a client call that returned the same `list[dict]` shape
+- *What I changed:* kept the implementation in `tools.py` under an alias and only wrapped it in `mcp_server.py`; verified with `python mcp_client.py` before wiring the agent
+
+**Moment 4 (this unit)**
+
+- *What I asked for:* a diagnosis for why criterion 4 looked too easy after a clean before-eval
+- *What came back:* the prompt was feeding labeled `Price:` / `Platform:` lines, so the model mostly echoed them
+- *What I changed:* rewrote only the `create_fit_card` prompt into one prose block with a hard 2 to 4 sentence cap, then re-ran `run_eval.py --label after`
 
 ---
 
@@ -284,7 +292,7 @@ Triggered failures (what the agent said):
       →    empty search — stopping before suggest_outfit / create_fit_card
 ```
 
-**On the MCP move:** `search_listings` is registered in `mcp_server.py` and called from `run_agent` via `mcp_client.call_tool`. The happy-path and empty-search traces both label that step `search_listings (via MCP)`.
+**On the MCP move:** In code, `mcp_server.py` registers `search_listings` with typed inputs and a description, and `agent.py::run_agent` calls it through `mcp_client.call_tool` instead of importing the tool directly. Behavior did not change: same listing ids and prices as the direct call, just slower because each ask starts the server over stdio. Traces label the step `search_listings (via MCP)`.
 
 ---
 
@@ -334,7 +342,15 @@ Just scored the absolute cutest Y2K butterfly baby tee on depop for only 18.0! I
 
 ## What's Still Broken
 
-Nothing failed its target on either run. The soft spots from Milestone 4 still stand: criterion 1 still uses an easy matching query, and criterion 4's target is still 4 of 5 even though both runs hit 5/5. I did not rewrite those criteria here. Empty wardrobe and model-unavailable are handled, but they are not among the five scored criteria.
+No scored criterion is still MISSED. Both before and after runs were MET on all five. What is still weak is not a failed row, but work I did not do:
+
+1. **Criterion 1 is under-stressed.** The scenario uses `vintage graphic tee under $30`, which always hits the data. What I would do next: add a borderline matching query (sparse keywords, odd synonyms) and keep the 4 of 5 target so false negatives in keyword search show up. Why I stopped: the before run already MET, and Milestone 5's one change went to the fit-card prompt instead.
+
+2. **Criterion 4's target is still 4 of 5.** Both runs hit 5/5. What I would do next: raise the target to 5 of 5 in `criteria.md` (leave the original line, add the revision underneath) now that the prompt no longer spoon-feeds labeled fields. Why I stopped: changing the target is not the same as fixing the agent, and I already spent the improvement slot on the prompt rewrite.
+
+3. **Only one tool is on MCP.** `suggest_outfit` and `create_fit_card` still run in-process. What I would do next: move a second tool only if a later unit asks for it. Why I stopped: Milestone 1 asked for one tool on purpose.
+
+4. **Failure modes outside the five.** Empty wardrobe and model-unavailable return usable messages, but they are not scored in `scenarios.py` as criteria 1 to 5. I left them as diagnostics so the run log stayed aligned with `criteria.md`.
 
 ---
 
