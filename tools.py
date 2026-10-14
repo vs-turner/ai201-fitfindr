@@ -152,13 +152,17 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
             f"Solid thrift pick — clean lines and an easy everyday vibe."
         )
 
+    # Diagnosis (Milestone 4): labeled Price/Platform lines made the model
+    # echo fields instead of writing a real caption. One prose block + a hard
+    # sentence cap is the whole change.
     prompt = (
-        "Write a short social-media caption about a thrift find. "
-        "Two to four sentences. Sound like a real post, not a product blurb. "
-        "Mention the item, its price, and its platform exactly once each.\n\n"
-        f"Item title: {title}\n"
-        f"Price: ${price}\n"
-        f"Platform: {platform}\n"
-        f"Outfit idea: {outfit.strip()}\n"
+        "Write a social caption about this thrift find as if you just bought it. "
+        "Use exactly 2, 3, or 4 sentences (no more). Sound like a real post, "
+        "not a product listing or a receipt. In the caption, name the item once, "
+        f"include the number {price} once as the price you paid, and name "
+        f"{platform} once as where you got it. Do not use labels like "
+        "'Price:' or 'Platform:'. You may nod at this outfit idea: "
+        f"{outfit.strip()}\n\n"
+        f"The find: {title}.\n"
     )
     return generate(prompt)

@@ -292,27 +292,41 @@ Triggered failures (what the agent said):
 
 ## The Improvement
 
+**What I changed:** One rewrite of the `create_fit_card` prompt in `tools.py`. Before, the prompt listed `Item title:`, `Price: $…`, and `Platform:` on separate lines, then asked the model to mention them. After, those facts sit in one prose instruction (`include the number {price}`, `name {platform}`), with an explicit ban on `Price:` / `Platform:` labels and a hard cap of exactly 2, 3, or 4 sentences.
 
+**Which failure it was meant to fix:** Not a MISSED row. Milestone 4 said criterion 4 looked safe because the model mostly echoed labeled fields from the prompt. This change targets that mechanism: model output for `create_fit_card`.
 
-**What I changed:**
+### Before vs after (side by side)
 
-**Which failure it was meant to fix:**
+| Criterion | Target | Before | After |
+| --------- | ------ | ------ | ----- |
+| 1. Matching query completes | 4 of 5 | MET (5/5) | MET (5/5) |
+| 2. Empty search stops | 5 of 5 | MET (5/5) | MET (5/5) |
+| 3. Selected item id matches | 5 of 5 | MET (5/5) | MET (5/5) |
+| 4. Fit card usable across variance | 4 of 5 | MET (5/5) | MET (5/5) |
+| 5. Search respects price ceiling | 5 of 5 | MET (5/5) | MET (5/5) |
+
+Full before log: `results/run_2026-10-13_1541_before.md`. Full after log: `results/run_2026-10-13_1702_after.md`.
 
 ### Run Log — After
 
+Produced by `run_eval.py::main` (caching off, 5 tries). Loop: `agent.py::run_agent`.
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 | --------- | ------ | ----- | ----- | ----- | ----- | ----- | ------- |
-| 1.        |        |       |       |       |       |       |         |
-| 2.        |        |       |       |       |       |       |         |
-| 3.        |        |       |       |       |       |       |         |
-| 4.        |        |       |       |       |       |       |         |
-| 5.        |        |       |       |       |       |       |         |
+| 1. Matching query completes all three tools + fit card | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Empty search stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item id matches item passed to suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card usable across model variance | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Search respects the price ceiling | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
+**Criterion 4 sample (after, Try 1)** from `results/run_2026-10-13_1702_after.md`:
 
-**Did it help, and how do I know:**
+```
+Just scored the absolute cutest Y2K butterfly baby tee on depop for only 18.0! I'm already planning to style it with baggy jeans and chunky sneakers for the ultimate nostalgic streetwear fit. My thrift luck has seriously been unmatched lately.
+```
 
-
+**Did it help, and how do I know:** It helped the writing, not the score: every criterion stayed MET (5/5), but after cards weave `18.0` and `depop` into normal sentences instead of echoing labeled `Price:` / `Platform:` fields.
 
 ---
 
@@ -320,9 +334,7 @@ Triggered failures (what the agent said):
 
 ## What's Still Broken
 
-
-
-
+Nothing failed its target on either run. The soft spots from Milestone 4 still stand: criterion 1 still uses an easy matching query, and criterion 4's target is still 4 of 5 even though both runs hit 5/5. I did not rewrite those criteria here. Empty wardrobe and model-unavailable are handled, but they are not among the five scored criteria.
 
 ---
 
